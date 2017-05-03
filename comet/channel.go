@@ -3,8 +3,6 @@ package main
 import (
 	"goim/libs/bufio"
 	"goim/libs/proto"
-
-	log "github.com/thinkboy/log4go"
 )
 
 // Channel used by message pusher send msg to write goroutine.
@@ -14,6 +12,8 @@ type Channel struct {
 	signal   chan *proto.Proto
 	Writer   bufio.Writer
 	Reader   bufio.Reader
+	Next     *Channel
+	Prev     *Channel
 }
 
 func NewChannel(cli, svr int, rid int32) *Channel {
@@ -29,15 +29,13 @@ func (c *Channel) Push(p *proto.Proto) (err error) {
 	select {
 	case c.signal <- p:
 	default:
-		log.Error("lost a message:%s room:%d", p.Body, c.RoomId)
 	}
 	return
 }
 
 // Ready check the channel ready or close?
-func (c *Channel) Ready() (p *proto.Proto) {
-	p = <-c.signal
-	return
+func (c *Channel) Ready() *proto.Proto {
+	return <-c.signal
 }
 
 // Signal send signal to the channel, protocol ready.

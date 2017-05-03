@@ -10,9 +10,17 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/gorilla/websocket"
 	log "github.com/thinkboy/log4go"
-	"golang.org/x/net/websocket"
 )
+
+var upgrader = websocket.Upgrader{
+	ReadBufferSize:  4096,
+	WriteBufferSize: 4096,
+	CheckOrigin: func(r *http.Request) bool {
+		return true
+	},
+}
 
 func InitWebsocket(addrs []string) (err error) {
 	var (
@@ -22,7 +30,8 @@ func InitWebsocket(addrs []string) (err error) {
 		httpServeMux = http.NewServeMux()
 		server       *http.Server
 	)
-	httpServeMux.Handle("/sub", websocket.Handler(serveWebsocket))
+	httpServeMux.HandleFunc("/sub", ServeWebSocket)
+
 	for _, bind = range addrs {
 		if addr, err = net.ResolveTCPAddr("tcp4", bind); err != nil {
 			log.Error("net.ResolveTCPAddr(\"tcp4\", \"%s\") error(%v)", bind, err)
@@ -36,12 +45,12 @@ func InitWebsocket(addrs []string) (err error) {
 		if Debug {
 			log.Debug("start websocket listen: \"%s\"", bind)
 		}
-		go func() {
+		go func(host string) {
 			if err = server.Serve(listener); err != nil {
-				log.Error("server.Serve(\"%s\") error(%v)", bind, err)
+				log.Error("server.Serve(\"%s\") error(%v)", host, err)
 				panic(err)
 			}
-		}()
+		}(bind)
 	}
 	return
 }
@@ -50,7 +59,7 @@ func InitWebsocketWithTLS(addrs []string, cert, priv string) (err error) {
 	var (
 		httpServeMux = http.NewServeMux()
 	)
-	httpServeMux.Handle("/sub", websocket.Handler(serveWebsocket))
+	httpServeMux.HandleFunc("/sub", ServeWebSocket)
 	config := &tls.Config{}
 	config.Certificates = make([]tls.Certificate, 1)
 	if config.Certificates[0], err = tls.LoadX509KeyPair(cert, priv); err != nil {
@@ -62,32 +71,40 @@ func InitWebsocketWithTLS(addrs []string, cert, priv string) (err error) {
 		if Debug {
 			log.Debug("start websocket wss listen: \"%s\"", bind)
 		}
-		go func() {
-			ln, err := net.Listen("tcp", bind)
+		go func(host string) {
+			ln, err := net.Listen("tcp", host)
 			if err != nil {
 				return
 			}
 
 			tlsListener := tls.NewListener(ln, config)
 			if err = server.Serve(tlsListener); err != nil {
-				log.Error("server.Serve(\"%s\") error(%v)", bind, err)
+				log.Error("server.Serve(\"%s\") error(%v)", host, err)
 				return
 			}
-		}()
+		}(bind)
 	}
 	return
 }
 
-func serveWebsocket(conn *websocket.Conn) {
+func ServeWebSocket(w http.ResponseWriter, req *http.Request) {
+	if req.Method != "GET" {
+		http.Error(w, "Method Not Allowed", 405)
+		return
+	}
+	ws, err := upgrader.Upgrade(w, req, nil)
+	if err != nil {
+		log.Error("Websocket Upgrade error(%v), userAgent(%s)", err, req.UserAgent())
+		return
+	}
+	defer ws.Close()
 	var (
-		// ip addr
-		lAddr = conn.LocalAddr()
-		rAddr = conn.RemoteAddr()
-		// timer
-		tr = DefaultServer.round.Timer(rand.Int())
+		lAddr = ws.LocalAddr()
+		rAddr = ws.RemoteAddr()
+		tr    = DefaultServer.round.Timer(rand.Int())
 	)
 	log.Debug("start websocket serve \"%s\" with \"%s\"", lAddr, rAddr)
-	DefaultServer.serveWebsocket(conn, tr)
+	DefaultServer.serveWebsocket(ws, tr)
 }
 
 func (server *Server) serveWebsocket(conn *websocket.Conn, tr *itime.Timer) {
@@ -108,7 +125,7 @@ func (server *Server) serveWebsocket(conn *websocket.Conn, tr *itime.Timer) {
 	if p, err = ch.CliProto.Set(); err == nil {
 		if key, ch.RoomId, hb, err = server.authWebsocket(conn, p); err == nil {
 			b = server.Bucket(key)
-			err = b.Put(key, ch, tr)
+			err = b.Put(key, ch)
 		}
 	}
 	if err != nil {
@@ -128,6 +145,7 @@ func (server *Server) serveWebsocket(conn *websocket.Conn, tr *itime.Timer) {
 		if err = p.ReadWebsocket(conn); err != nil {
 			break
 		}
+		//p.Time = *globalNowTime
 		if p.Operation == define.OP_HEARTBEAT {
 			// heartbeat
 			tr.Set(trd, hb)
@@ -143,6 +161,7 @@ func (server *Server) serveWebsocket(conn *websocket.Conn, tr *itime.Timer) {
 		ch.Signal()
 	}
 	log.Error("key: %s server websocket failed error(%v)", key, err)
+	tr.Del(trd)
 	conn.Close()
 	ch.Close()
 	b.Del(key)
@@ -192,7 +211,6 @@ func (server *Server) dispatchWebsocket(key string, conn *websocket.Conn, ch *Ch
 			if err = p.WriteWebsocket(conn); err != nil {
 				goto failed
 			}
-			p.Body = nil // avoid memory leak
 		}
 	}
 failed:
@@ -200,6 +218,13 @@ failed:
 		log.Error("key: %s dispatch websocket error(%v)", key, err)
 	}
 	conn.Close()
+	// must ensure all channel message discard, for reader won't blocking Signal
+	for {
+		if p == proto.ProtoFinish {
+			break
+		}
+		p = ch.Ready()
+	}
 	if Debug {
 		log.Debug("key: %s dispatch goroutine exit", key)
 	}
@@ -217,7 +242,7 @@ func (server *Server) authWebsocket(conn *websocket.Conn, p *proto.Proto) (key s
 	if key, rid, heartbeat, err = server.operator.Connect(p); err != nil {
 		return
 	}
-	p.Body = nil
+	p.Body = emptyJSONBody
 	p.Operation = define.OP_AUTH_REPLY
 	err = p.WriteWebsocket(conn)
 	return

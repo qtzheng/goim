@@ -58,13 +58,14 @@ $ source /etc/profile
 ```sh
 $ yum install hg
 $ go get -u github.com/Terry-Mao/goim
-$ cd /data/apps/go/src/github.com/Terry-Mao/goim
+$ mv $GOPATH/src/github.com/Terry-Mao/goim $GOPATH/src/goim
+$ cd $GOPATH/src/goim
 $ go get ./...
 ```
 
 2.安装router、logic、comet、job模块(配置文件请依据实际机器环境配置)
 ```sh
-$ cd $GOPATH/src/github.com/Terry-Mao/goim/router
+$ cd $GOPATH/src/goim/router
 $ go install
 $ cp router-example.conf $GOPATH/bin/router.conf
 $ cp router-log.xml $GOPATH/bin/

@@ -36,7 +36,7 @@ func InitRoomBucket(r *Round, options RoomOptions) {
 }
 
 func (this *RoomBucket) Get(roomId int32) (r *Room) {
-	this.rwLock.RLock()
+	this.rwLock.Lock()
 	room, ok := this.rooms[roomId]
 	if !ok {
 		room = NewRoom(roomId, this.round.Timer(this.roomNum), this.options)
@@ -44,7 +44,7 @@ func (this *RoomBucket) Get(roomId int32) (r *Room) {
 		this.roomNum++
 		log.Debug("new roomId:%d num:%d", roomId, this.roomNum)
 	}
-	this.rwLock.RUnlock()
+	this.rwLock.Unlock()
 	return room
 }
 
@@ -55,7 +55,6 @@ type RoomOptions struct {
 
 type Room struct {
 	id    int32
-	rLock sync.RWMutex
 	proto chan *proto.Proto
 }
 
@@ -128,6 +127,7 @@ func (r *Room) pushproc(timer *itime.Timer, batch int, sigTime time.Duration) {
 		}
 		broadcastRoomBytes(r.id, buf.Buffer())
 		n = 0
+		// TODO use reset buffer
 		// after push to room channel, renew a buffer, let old buffer gc
 		buf = bytes.NewWriterSize(buf.Size())
 	}

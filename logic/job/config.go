@@ -20,19 +20,26 @@ func init() {
 }
 
 type Config struct {
-	Log          string           `goconf:"base:log"`
-	ZKAddrs      []string         `goconf:"kafka:zookeeper.list:,"`
-	ZKRoot       string           `goconf:"kafka:zkroot"`
-	KafkaTopic   string           `goconf:"kafka:topic"`
-	Comets       map[int32]string `goconf:"-"`
-	PushChan     int              `goconf:"push:chan"`
-	PushChanSize int              `goconf:"push:chan.size"`
+	Log        string   `goconf:"base:log"`
+	ZKAddrs    []string `goconf:"kafka:zookeeper.list:,"`
+	ZKRoot     string   `goconf:"kafka:zkroot"`
+	KafkaTopic string   `goconf:"kafka:topic"`
+	// comet
+	Comets      map[int32]string `goconf:"-"`
+	RoutineSize int64            `goconf:"comet:routine.size"`
+	RoutineChan int              `goconf:"comet:routine.chan"`
+	// push
+	PushChan     int `goconf:"push:chan"`
+	PushChanSize int `goconf:"push:chan.size"`
 	// timer
 	Timer     int `goconf:"timer:num"`
 	TimerSize int `goconf:"timer:size"`
 	// room
 	RoomBatch  int           `goconf:"room:batch"`
 	RoomSignal time.Duration `goconf:"room:signal:time"`
+	// monitor
+	MonitorOpen  bool     `goconf:"monitor:open"`
+	MonitorAddrs []string `goconf:"monitor:addrs:,"`
 }
 
 func NewConfig() *Config {
@@ -40,6 +47,8 @@ func NewConfig() *Config {
 		Comets:       make(map[int32]string),
 		ZKRoot:       "",
 		KafkaTopic:   "kafka_topic_push",
+		RoutineSize:  16,
+		RoutineChan:  64,
 		PushChan:     4,
 		PushChanSize: 100,
 		//timer

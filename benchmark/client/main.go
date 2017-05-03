@@ -71,9 +71,7 @@ func main() {
 	go result()
 
 	for i := begin; i < begin+num; i++ {
-		key := fmt.Sprintf("%d", i)
-		quit := make(chan bool, 1)
-		go startClient(key, quit)
+		go client(fmt.Sprintf("%d", i))
 	}
 
 	var exit chan bool
@@ -97,8 +95,17 @@ func result() {
 	}
 }
 
-func startClient(key string, quit chan bool) {
+func client(key string) {
+	for {
+		startClient(key)
+		time.Sleep(3 * time.Second)
+	}
+}
+
+func startClient(key string) {
 	//time.Sleep(time.Duration(mrand.Intn(30)) * time.Second)
+	quit := make(chan bool, 1)
+	defer close(quit)
 
 	conn, err := net.Dial("tcp", os.Args[3])
 	if err != nil {
@@ -147,16 +154,6 @@ func startClient(key string, quit chan bool) {
 				return
 			default:
 			}
-
-			// op_test
-			/*proto1.Operation = OP_TEST
-			proto1.SeqId = seqId
-			if err = tcpWriteProto(wr, proto1); err != nil {
-				log.Error("tcpWriteProto() error(%v)", err)
-				return
-			}
-			seqId++
-			time.Sleep(10000 * time.Millisecond)*/
 		}
 	}()
 	// reader

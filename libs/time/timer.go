@@ -92,6 +92,7 @@ func (t *Timer) get() (td *TimerData) {
 
 // put put back a timer data.
 func (t *Timer) put(td *TimerData) {
+	td.fn = nil
 	td.next = t.free
 	t.free = td
 }
@@ -207,7 +208,7 @@ func (t *Timer) expire() {
 			break
 		}
 		fn = td.fn
-		// let caller put back
+		// let caller put back, usually by Del()
 		t.del(td)
 		t.lock.Unlock()
 		if fn == nil {
@@ -222,7 +223,7 @@ func (t *Timer) expire() {
 	}
 	t.signal.Reset(d)
 	if Debug {
-		log.Debug("timer: expier reset delay %d ms", int64(d)/int64(itime.Millisecond))
+		log.Debug("timer: expire reset delay %d ms", int64(d)/int64(itime.Millisecond))
 	}
 	t.lock.Unlock()
 	return
@@ -231,7 +232,7 @@ func (t *Timer) expire() {
 func (t *Timer) up(j int) {
 	for {
 		i := (j - 1) / 2 // parent
-		if i == j || !t.less(j, i) {
+		if j <= 0 || !t.less(j, i) {
 			break
 		}
 		t.swap(i, j)

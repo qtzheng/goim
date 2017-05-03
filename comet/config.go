@@ -44,6 +44,8 @@ type Config struct {
 	StatBind  []string `goconf:"base:stat.bind:,"`
 	ServerId  int32    `goconf:"base:server.id"`
 	Debug     bool     `goconf:"base:debug"`
+	Whitelist []string `goconf:"base:white.list:,"`
+	WhiteLog  string   `goconf:"base:white.log"`
 	// tcp
 	TCPBind         []string `goconf:"tcp:bind:,"`
 	TCPSndbuf       int      `goconf:"tcp:sndbuf:memory"`
@@ -78,12 +80,13 @@ type Config struct {
 	BucketRoom    int   `goconf:"bucket:room"`
 	RoutineAmount int64 `goconf:"bucket:routine.amount"`
 	RoutineSize   int   `goconf:"bucket:routine.size"`
-	// room
-	RoomChannel int `goconf:"room:channel"`
 	// push
 	RPCPushAddrs []string `goconf:"push:rpc.addrs:,"`
 	// logic
-	LogicAddr string `goconf:"logic:rpc.addrs"`
+	LogicAddrs []string `goconf:"logic:rpc.addrs:,"`
+	// monitor
+	MonitorOpen  bool     `goconf:"monitor:open"`
+	MonitorAddrs []string `goconf:"monitor:addrs:,"`
 }
 
 func NewConfig() *Config {

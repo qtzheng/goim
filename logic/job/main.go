@@ -15,8 +15,17 @@ func main() {
 	log.LoadConfiguration(Conf.Log)
 	runtime.GOMAXPROCS(runtime.NumCPU())
 	//comet
-	if err := InitComet(Conf.Comets); err != nil {
+	err := InitComet(Conf.Comets,
+		CometOptions{
+			RoutineSize: Conf.RoutineSize,
+			RoutineChan: Conf.RoutineChan,
+		})
+	if err != nil {
 		log.Warn("comet rpc current can't connect, retry")
+	}
+	// start monitor
+	if Conf.MonitorOpen {
+		InitMonitor(Conf.MonitorAddrs)
 	}
 	//round
 	round := NewRound(RoundOptions{

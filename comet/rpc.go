@@ -67,7 +67,7 @@ func (this *PushRPC) PushMsg(arg *proto.PushMsgArg, reply *proto.NoReply) (err e
 	return
 }
 
-// Push push a message to a specified sub key
+// Push push a message to specified sub keys
 func (this *PushRPC) MPushMsg(arg *proto.MPushMsgArg, reply *proto.MPushMsgReply) (err error) {
 	var (
 		bucket  *Bucket
@@ -140,11 +140,11 @@ func (this *PushRPC) Rooms(arg *proto.NoArg, reply *proto.RoomsReply) (err error
 	var (
 		roomId  int32
 		bucket  *Bucket
-		roomIds []int32
+		roomIds = make(map[int32]struct{})
 	)
 	for _, bucket = range DefaultServer.Buckets {
 		for roomId, _ = range bucket.Rooms() {
-			roomIds = append(roomIds, roomId)
+			roomIds[roomId] = struct{}{}
 		}
 	}
 	reply.RoomIds = roomIds
